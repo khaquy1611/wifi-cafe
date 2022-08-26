@@ -1,0 +1,16 @@
+filebeat.registry_file: /var/lib/filebeat/registry
+filebeat.prospectors:
+- type: log
+  enabled: true
+  paths:
+   - /app/server/log/*.log
+  fields:
+    domain: ELK_INDEX
+  fields_under_root: true
+output.redis:
+  hosts: ["redis-logs-appotapay-com"]
+  password: ELK_REDIS_PASS
+  key: "laravel"
+  db: 0
+  timeout: 5
+  worker: 2

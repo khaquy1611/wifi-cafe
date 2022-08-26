@@ -1,0 +1,49 @@
+replicaCount: 1
+
+runtime: RUN_TIME
+
+image:
+  repository: CI_REGISTRY_IMAGE
+  tag: CI_COMMIT_REF_NAME
+  pullPolicy: Always
+
+port:
+  name: http
+  containerPort: 80
+  protocol: TCP
+
+registry:
+  private: true
+  secret: docker-appota-com-registry
+
+service:
+  name: SERVICE_NAME
+  environment: CI_ENVIRONMENT_NAME
+  framework: nodejs
+  type: ClusterIP
+  port: 80
+
+healthcheck:
+  enabled: true
+  livenesspath: /healthcheck
+  readinesspath: /healthcheck
+  port: 5000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 4
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    certmanager.k8s.io/cluster-issuer: letsencrypt-http01
+    certmanager.k8s.io/acme-challenge-type: http01
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+  paths: [/]
+  hosts:
+    - wificaphe.com
+  tls:
+    - secretName: wificaphe-com-tls
+      hosts:
+        - wificaphe.com

@@ -1,0 +1,139 @@
+---
+# Gitlab CI configuration file
+
+image: docker.appota.com/kdata-research/alpine-bash
+
+variables:
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
+  HELM_RELEASE: ${CI_ENVIRONMENT_NAME}-${SERVICE_NAME}
+
+stages:
+  - build
+  - deploy
+
+#
+# Build development
+#
+build_dev:
+  image: docker.appota.com/kdata-research/alpine-bash:nodejs
+  environment: 
+    name: development
+  stage: build
+  only:
+    - develop
+  tags:
+    - kubernetes
+    - congcf
+    - develop
+  script:
+    - export ELK_INDEX=${DEV_ELK_INDEX}
+    - bash ci_cd/filebeat.sh
+    - export VAULT_PATH_SECRET=${DEV_VAULT_PATH_SECRET}
+    - bash ci_cd/build.sh
+    - docker login -u deploy -p "$DEPLOY_TOKEN" $CI_REGISTRY
+    - echo "$CI_COMMIT_SHA" > src/server/nfo.txt
+    - DOCKER_BUILDKIT=1 docker build -t $IMAGE_TAG --progress=plain .
+    - docker push $IMAGE_TAG
+
+# 
+# DEPLOY development
+# 
+deploy_dev:
+  image: docker.appota.com/kdata-research/alpine-bash:kubernetes
+  environment: 
+    name: development
+  stage: deploy
+  only:
+    - develop
+  tags:
+    - kubernetes
+    - congcf 
+    - develop
+  script:
+    - kubectl get node
+    - bash ci_cd/k8s_prod_deploy.sh dev-congcf
+  when: on_success
+
+# 
+# Build staging
+# 
+build_staging:
+  image: docker.appota.com/kdata-research/alpine-bash:nodejs
+  environment: 
+    name: staging
+  stage: build
+  only:
+    - staging
+  tags:
+    - kubernetes
+    - congcf 
+    - develop
+  script:
+    - export ELK_INDEX=${PROD_ELK_INDEX}
+    - bash ci_cd/filebeat.sh
+    - export VAULT_PATH_SECRET=${STAGING_VAULT_PATH_SECRET}
+    - bash ci_cd/build.sh
+    - docker login -u deploy -p "$DEPLOY_TOKEN" $CI_REGISTRY
+    - echo "$CI_COMMIT_SHA" > src/server/nfo.txt
+    - DOCKER_BUILDKIT=1 docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+
+# 
+# DEPLOY staging
+# 
+deploy_staging:
+  image: docker.appota.com/kdata-research/alpine-bash:kubernetes
+  environment:
+    name: staging
+  stage: deploy
+  only:
+    - staging
+  tags:
+    - kubernetes
+    - congcf 
+    - develop
+  script:
+    - bash ci_cd/k8s_prod_deploy.sh stag-congcf
+  when: on_success
+
+# 
+# Build production
+# 
+build_prod:
+  image: docker.appota.com/kdata-research/alpine-bash:nodejs
+  environment: 
+    name: production
+  stage: build
+  only:
+    - tags
+  tags:
+    - kubernetes
+    - prod-congcf
+    - reactnative
+  script:
+    - export ELK_INDEX=${PROD_ELK_INDEX}
+    - bash ci_cd/filebeat.sh
+    - export VAULT_PATH_SECRET=${PROD_VAULT_PATH_SECRET}
+    - bash ci_cd/build.sh
+    - docker login -u deploy -p "$DEPLOY_TOKEN" $CI_REGISTRY
+    - echo "$CI_COMMIT_SHA" > src/server/nfo.txt
+    - DOCKER_BUILDKIT=1 docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+
+# 
+# DEPLOY production
+# 
+deploy_prod:
+  image: docker.appota.com/kdata-research/alpine-bash:kubernetes
+  environment:
+    name: production
+  stage: deploy
+  only:
+    - tags
+  tags:
+    - kubernetes
+    - prod-congcf 
+    - reactnative
+  script:
+    - bash ci_cd/k8s_prod_deploy.sh prod-congcf
+  when: on_success
